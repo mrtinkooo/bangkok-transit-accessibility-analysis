@@ -199,8 +199,8 @@
     
     <div id="map">
         <div class="controls">
-            <button onclick="zoom(1.2)" title="Zoom In">+</button>
-            <button onclick="zoom(0.8)" title="Zoom Out">−</button>
+            <button onclick="zoom(ZOOM_IN_FACTOR)" title="Zoom In">+</button>
+            <button onclick="zoom(ZOOM_OUT_FACTOR)" title="Zoom Out">−</button>
             <button onclick="resetView()" title="Reset View">⌂</button>
         </div>
         <div class="legend">
@@ -237,6 +237,12 @@
         let translateY = 0;
         let isDragging = false;
         let startX, startY;
+        
+        // Constants
+        const ZOOM_IN_FACTOR = 1.2;
+        const ZOOM_OUT_FACTOR = 0.8;
+        const WHEEL_ZOOM_IN_FACTOR = 1.1;
+        const WHEEL_ZOOM_OUT_FACTOR = 0.9;
         
         const svg = document.getElementById('mapSvg');
         const tooltip = document.getElementById('tooltip');
@@ -550,15 +556,15 @@
         // Pan functionality
         svg.addEventListener('mousedown', (e) => {
             isDragging = true;
-            startX = e.clientX - translateX;
-            startY = e.clientY - translateY;
+            startX = e.clientX / scale - translateX;
+            startY = e.clientY / scale - translateY;
             svg.style.cursor = 'grabbing';
         });
         
         svg.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            translateX = e.clientX - startX;
-            translateY = e.clientY - startY;
+            translateX = e.clientX / scale - startX;
+            translateY = e.clientY / scale - startY;
             renderMap();
         });
         
@@ -575,7 +581,7 @@
         // Mouse wheel zoom
         svg.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            const zoomFactor = e.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : WHEEL_ZOOM_OUT_FACTOR;
             zoom(zoomFactor);
         });
         
@@ -596,15 +602,16 @@
                         data.metadata.total_stations || '—';
                     document.getElementById('coverage-area').textContent = 
                         (data.metadata.transit_coverage_sqkm || 0).toFixed(2) + ' km²';
+                    const desertGaps = data.metadata.transit_desert_gaps;
                     document.getElementById('desert-count').textContent = 
-                        (data.metadata.transit_desert_gaps || []).length;
+                        Array.isArray(desertGaps) ? desertGaps.length : '—';
                 }
                 
                 renderMap();
             })
             .catch(error => {
                 console.error('Error loading GeoJSON:', error);
-                alert('Error loading coverage.geojson');
+                alert(`Error loading coverage.geojson: ${error.message}. Please ensure the file exists in the same directory as index.html.`);
             });
     </script>
 </body>
