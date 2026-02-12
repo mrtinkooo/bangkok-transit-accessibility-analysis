@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bangkok Rail Network - Transit Accessibility Analysis</title>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1E90FF 0%, #0332F8 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-top: 12px;
+            font-size: 13px;
+        }
+        
+        .stat-item {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        #map {
+            flex: 1;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+        
+        #map svg {
+            width: 100%;
+            height: 100%;
+            cursor: move;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            line-height: 1.8;
+            font-size: 13px;
+            z-index: 1000;
+        }
+        
+        .legend h4 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 2px solid #1E90FF;
+            padding-bottom: 5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+        
+        .legend-symbol {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border: 1px solid #666;
+            border-radius: 3px;
+        }
+        
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            margin-right: 8px;
+        }
+        
+        .legend-circle {
+            width: 10px;
+            height: 10px;
+            margin-right: 8px;
+            border-radius: 50%;
+            border: 2px solid #333;
+        }
+        
+        .popup-content {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        
+        .popup-content h3 {
+            margin-bottom: 8px;
+            color: #1E90FF;
+            font-size: 15px;
+        }
+        
+        .popup-content .detail {
+            margin: 4px 0;
+        }
+        
+        .popup-content .label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        
+        .controls button {
+            display: block;
+            width: 30px;
+            height: 30px;
+            margin: 5px 0;
+            border: none;
+            background: #1E90FF;
+            color: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        
+        .controls button:hover {
+            background: #0066CC;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            pointer-events: none;
+            display: none;
+            z-index: 2000;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚆 Bangkok Rail Network – Transit Accessibility Analysis</h1>
+        <div class="subtitle">1 km station buffers (~10-15 min walk), transit desert gaps, and network coverage footprint</div>
+        <div class="stats">
+            <div class="stat-item">
+                <div>Stations</div>
+                <div class="stat-value" id="total-stations">—</div>
+            </div>
+            <div class="stat-item">
+                <div>Coverage Area</div>
+                <div class="stat-value" id="coverage-area">—</div>
+            </div>
+            <div class="stat-item">
+                <div>Transit Deserts</div>
+                <div class="stat-value" id="desert-count">—</div>
+            </div>
+        </div>
+    </header>
+    
+    <div id="map">
+        <div class="controls">
+            <button onclick="zoom(1.2)" title="Zoom In">+</button>
+            <button onclick="zoom(0.8)" title="Zoom Out">−</button>
+            <button onclick="resetView()" title="Reset View">⌂</button>
+        </div>
+        <div class="legend">
+            <h4>Legend</h4>
+            <div class="legend-item">
+                <div class="legend-circle" style="background-color: #0332F8; border-color: #fff;"></div>
+                <span>Rail Stations</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol" style="background-color: rgba(65, 105, 225, 0.15); border-color: #4169E1;"></div>
+                <span>1 km Buffer (~10-15 min walk)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol" style="background-color: rgba(30, 144, 255, 0.05); border: 2px dashed #1E90FF;"></div>
+                <span>Network Footprint</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line" style="background-color: #FF0000;"></div>
+                <span>Transit Desert Gap (>5 km)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol" style="background-color: rgba(255, 68, 68, 0.15); border-color: #FF0000;"></div>
+                <span>Transit Desert Zone</span>
+            </div>
+        </div>
+        <svg id="mapSvg"></svg>
+        <div id="tooltip" class="tooltip"></div>
+    </div>
+    
+    <script>
+        let geojsonData = null;
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let isDragging = false;
+        let startX, startY;
+        
+        const svg = document.getElementById('mapSvg');
+        const tooltip = document.getElementById('tooltip');
+        
+        // Convert lat/lng to SVG coordinates
+        function latLngToSVG(lng, lat, bounds, svgWidth, svgHeight) {
+            const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * svgWidth;
+            const y = svgHeight - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * svgHeight;
+            return { x, y };
+        }
+        
+        // Get bounds from GeoJSON
+        function getBounds(features) {
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+            
+            features.forEach(feature => {
+                if (feature.geometry.type === 'Point') {
+                    const [lng, lat] = feature.geometry.coordinates;
+                    minLat = Math.min(minLat, lat);
+                    maxLat = Math.max(maxLat, lat);
+                    minLng = Math.min(minLng, lng);
+                    maxLng = Math.max(maxLng, lng);
+                } else if (feature.geometry.type === 'Polygon') {
+                    feature.geometry.coordinates[0].forEach(([lng, lat]) => {
+                        minLat = Math.min(minLat, lat);
+                        maxLat = Math.max(maxLat, lat);
+                        minLng = Math.min(minLng, lng);
+                        maxLng = Math.max(maxLng, lng);
+                    });
+                } else if (feature.geometry.type === 'LineString') {
+                    feature.geometry.coordinates.forEach(([lng, lat]) => {
+                        minLat = Math.min(minLat, lat);
+                        maxLat = Math.max(maxLat, lat);
+                        minLng = Math.min(minLng, lng);
+                        maxLng = Math.max(maxLng, lng);
+                    });
+                }
+            });
+            
+            // Add padding
+            const latPadding = (maxLat - minLat) * 0.1;
+            const lngPadding = (maxLng - minLng) * 0.1;
+            
+            return {
+                minLat: minLat - latPadding,
+                maxLat: maxLat + latPadding,
+                minLng: minLng - lngPadding,
+                maxLng: maxLng + lngPadding
+            };
+        }
+        
+        // Draw polygon
+        function drawPolygon(coords, bounds, svgWidth, svgHeight, style, tooltip, props) {
+            const points = coords.map(([lng, lat]) => {
+                const { x, y } = latLngToSVG(lng, lat, bounds, svgWidth, svgHeight);
+                return `${x},${y}`;
+            }).join(' ');
+            
+            const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            polygon.setAttribute('points', points);
+            polygon.setAttribute('fill', style.fillColor || 'none');
+            polygon.setAttribute('fill-opacity', style.fillOpacity || 0.3);
+            polygon.setAttribute('stroke', style.stroke || '#000');
+            polygon.setAttribute('stroke-width', style.strokeWidth || 1);
+            if (style.strokeDasharray) {
+                polygon.setAttribute('stroke-dasharray', style.strokeDasharray);
+            }
+            
+            if (tooltip) {
+                polygon.style.cursor = 'pointer';
+                polygon.addEventListener('mouseenter', (e) => showTooltip(e, tooltip));
+                polygon.addEventListener('mousemove', (e) => moveTooltip(e));
+                polygon.addEventListener('mouseleave', hideTooltip);
+            }
+            
+            return polygon;
+        }
+        
+        // Draw line
+        function drawLine(coords, bounds, svgWidth, svgHeight, style, tooltipText) {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            const start = latLngToSVG(coords[0][0], coords[0][1], bounds, svgWidth, svgHeight);
+            const end = latLngToSVG(coords[1][0], coords[1][1], bounds, svgWidth, svgHeight);
+            
+            line.setAttribute('x1', start.x);
+            line.setAttribute('y1', start.y);
+            line.setAttribute('x2', end.x);
+            line.setAttribute('y2', end.y);
+            line.setAttribute('stroke', style.stroke || '#000');
+            line.setAttribute('stroke-width', style.strokeWidth || 2);
+            if (style.strokeDasharray) {
+                line.setAttribute('stroke-dasharray', style.strokeDasharray);
+            }
+            
+            if (tooltipText) {
+                line.style.cursor = 'pointer';
+                line.addEventListener('mouseenter', (e) => showTooltip(e, tooltipText));
+                line.addEventListener('mousemove', (e) => moveTooltip(e));
+                line.addEventListener('mouseleave', hideTooltip);
+            }
+            
+            return line;
+        }
+        
+        // Draw point
+        function drawPoint(lng, lat, bounds, svgWidth, svgHeight, style, tooltipText) {
+            const { x, y } = latLngToSVG(lng, lat, bounds, svgWidth, svgHeight);
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            
+            circle.setAttribute('cx', x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', style.radius || 6);
+            circle.setAttribute('fill', style.fillColor || '#0332F8');
+            circle.setAttribute('stroke', style.stroke || '#fff');
+            circle.setAttribute('stroke-width', style.strokeWidth || 2);
+            
+            if (tooltipText) {
+                circle.style.cursor = 'pointer';
+                circle.addEventListener('mouseenter', (e) => showTooltip(e, tooltipText));
+                circle.addEventListener('mousemove', (e) => moveTooltip(e));
+                circle.addEventListener('mouseleave', hideTooltip);
+            }
+            
+            return circle;
+        }
+        
+        // Tooltip functions
+        function showTooltip(e, html) {
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+            moveTooltip(e);
+        }
+        
+        function moveTooltip(e) {
+            tooltip.style.left = (e.pageX + 10) + 'px';
+            tooltip.style.top = (e.pageY + 10) + 'px';
+        }
+        
+        function hideTooltip() {
+            tooltip.style.display = 'none';
+        }
+        
+        // Get tooltip content
+        function getTooltipContent(feature) {
+            const props = feature.properties;
+            let content = '<div class="popup-content">';
+            
+            if (props.type === 'station') {
+                content += `<h3>🚉 ${props.name}</h3>`;
+                if (props.nameTH) {
+                    content += `<div class="detail"><span class="label">Thai Name:</span> ${props.nameTH}</div>`;
+                }
+                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
+                content += `<div class="detail"><span class="label">Service:</span> ${props.service}</div>`;
+            } else if (props.type === 'buffer_1km') {
+                content += `<h3>📍 Station Buffer</h3>`;
+                content += `<div class="detail"><span class="label">Station:</span> ${props.name}</div>`;
+                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
+                content += `<div class="detail"><span class="label">Radius:</span> ${props.radius_km} km</div>`;
+            } else if (props.type === 'transit_desert_gap') {
+                content += `<h3>⚠️ Transit Desert Gap</h3>`;
+                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
+                content += `<div class="detail"><span class="label">From:</span> ${props.from_station}</div>`;
+                content += `<div class="detail"><span class="label">To:</span> ${props.to_station}</div>`;
+                content += `<div class="detail"><span class="label">Gap:</span> ${props.gap_km} km</div>`;
+            } else if (props.type === 'transit_desert_zone') {
+                content += `<h3>🏜️ Transit Desert Zone</h3>`;
+                content += `<div class="detail"><span class="label">Rank:</span> #${props.rank}</div>`;
+                content += `<div class="detail"><span class="label">Nearest Station:</span> ${props.nearest_station_km} km</div>`;
+            } else if (props.type === 'network_footprint') {
+                content += `<h3>🗺️ Network Footprint</h3>`;
+                content += `<div class="detail">${props.description}</div>`;
+            }
+            
+            content += '</div>';
+            return content;
+        }
+        
+        // Render map
+        function renderMap() {
+            if (!geojsonData) return;
+            
+            const svgRect = svg.getBoundingClientRect();
+            const svgWidth = svgRect.width;
+            const svgHeight = svgRect.height;
+            
+            svg.innerHTML = '';
+            
+            const bounds = getBounds(geojsonData.features);
+            
+            // Create main group with transform
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('transform', `translate(${translateX}, ${translateY}) scale(${scale})`);
+            
+            // Draw features in order: footprint, buffers, deserts, gaps, stations
+            const layers = {
+                footprint: [],
+                buffers: [],
+                desertZones: [],
+                desertGaps: [],
+                stations: []
+            };
+            
+            geojsonData.features.forEach(feature => {
+                const type = feature.properties.type;
+                
+                if (type === 'network_footprint' && feature.geometry.type === 'Polygon') {
+                    const el = drawPolygon(
+                        feature.geometry.coordinates[0],
+                        bounds,
+                        svgWidth,
+                        svgHeight,
+                        {
+                            fillColor: feature.properties.color || '#1E90FF',
+                            fillOpacity: feature.properties.fillOpacity || 0.05,
+                            stroke: '#1E90FF',
+                            strokeWidth: 2,
+                            strokeDasharray: '5,5'
+                        },
+                        getTooltipContent(feature)
+                    );
+                    layers.footprint.push(el);
+                } else if (type === 'buffer_1km' && feature.geometry.type === 'Polygon') {
+                    const el = drawPolygon(
+                        feature.geometry.coordinates[0],
+                        bounds,
+                        svgWidth,
+                        svgHeight,
+                        {
+                            fillColor: feature.properties.color || '#4169E1',
+                            fillOpacity: 0.15,
+                            stroke: feature.properties.color || '#4169E1',
+                            strokeWidth: 1
+                        },
+                        getTooltipContent(feature)
+                    );
+                    layers.buffers.push(el);
+                } else if (type === 'transit_desert_zone' && feature.geometry.type === 'Polygon') {
+                    const el = drawPolygon(
+                        feature.geometry.coordinates[0],
+                        bounds,
+                        svgWidth,
+                        svgHeight,
+                        {
+                            fillColor: feature.properties.color || '#FF4444',
+                            fillOpacity: feature.properties.fillOpacity || 0.15,
+                            stroke: '#FF0000',
+                            strokeWidth: 2
+                        },
+                        getTooltipContent(feature)
+                    );
+                    layers.desertZones.push(el);
+                } else if (type === 'transit_desert_gap' && feature.geometry.type === 'LineString') {
+                    const el = drawLine(
+                        feature.geometry.coordinates,
+                        bounds,
+                        svgWidth,
+                        svgHeight,
+                        {
+                            stroke: '#FF0000',
+                            strokeWidth: 3,
+                            strokeDasharray: '10,5'
+                        },
+                        getTooltipContent(feature)
+                    );
+                    layers.desertGaps.push(el);
+                } else if (type === 'station' && feature.geometry.type === 'Point') {
+                    const [lng, lat] = feature.geometry.coordinates;
+                    const el = drawPoint(
+                        lng,
+                        lat,
+                        bounds,
+                        svgWidth,
+                        svgHeight,
+                        {
+                            radius: 6,
+                            fillColor: feature.properties.color || '#0332F8',
+                            stroke: '#fff',
+                            strokeWidth: 2
+                        },
+                        getTooltipContent(feature)
+                    );
+                    layers.stations.push(el);
+                }
+            });
+            
+            // Add layers in order
+            layers.footprint.forEach(el => g.appendChild(el));
+            layers.buffers.forEach(el => g.appendChild(el));
+            layers.desertZones.forEach(el => g.appendChild(el));
+            layers.desertGaps.forEach(el => g.appendChild(el));
+            layers.stations.forEach(el => g.appendChild(el));
+            
+            svg.appendChild(g);
+        }
+        
+        // Zoom functions
+        function zoom(factor) {
+            scale *= factor;
+            renderMap();
+        }
+        
+        function resetView() {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            renderMap();
+        }
+        
+        // Pan functionality
+        svg.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - translateX;
+            startY = e.clientY - translateY;
+            svg.style.cursor = 'grabbing';
+        });
+        
+        svg.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            translateX = e.clientX - startX;
+            translateY = e.clientY - startY;
+            renderMap();
+        });
+        
+        svg.addEventListener('mouseup', () => {
+            isDragging = false;
+            svg.style.cursor = 'move';
+        });
+        
+        svg.addEventListener('mouseleave', () => {
+            isDragging = false;
+            svg.style.cursor = 'move';
+        });
+        
+        // Mouse wheel zoom
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            zoom(zoomFactor);
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            renderMap();
+        });
+        
+        // Load GeoJSON
+        fetch('coverage.geojson')
+            .then(response => response.json())
+            .then(data => {
+                geojsonData = data;
+                
+                // Update statistics
+                if (data.metadata) {
+                    document.getElementById('total-stations').textContent = 
+                        data.metadata.total_stations || '—';
+                    document.getElementById('coverage-area').textContent = 
+                        (data.metadata.transit_coverage_sqkm || 0).toFixed(2) + ' km²';
+                    document.getElementById('desert-count').textContent = 
+                        (data.metadata.transit_desert_gaps || []).length;
+                }
+                
+                renderMap();
+            })
+            .catch(error => {
+                console.error('Error loading GeoJSON:', error);
+                alert('Error loading coverage.geojson');
+            });
+    </script>
+</body>
+</html>
