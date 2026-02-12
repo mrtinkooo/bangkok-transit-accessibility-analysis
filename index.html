@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bangkok Rail Transit Accessibility Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+    #map { width: 100%; height: 100vh; }
+
+    /* ── Title overlay ── */
+    .map-title {
+      position: absolute; top: 12px; left: 60px; z-index: 1000;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(6px);
+      padding: 10px 18px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      max-width: 420px;
+    }
+    .map-title h1 { font-size: 16px; color: #1a1a2e; margin-bottom: 2px; }
+    .map-title p  { font-size: 11px; color: #555; line-height: 1.4; }
+
+    /* ── Legend ── */
+    .legend {
+      position: absolute; bottom: 28px; left: 12px; z-index: 1000;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(6px);
+      padding: 12px 16px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      font-size: 12px; line-height: 1.8;
+    }
+    .legend h4 { margin-bottom: 6px; color: #1a1a2e; font-size: 13px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-swatch {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,.15); flex-shrink: 0;
+    }
+    .legend-line {
+      width: 22px; height: 3px; border-radius: 2px; flex-shrink: 0;
+    }
+    .legend-dash {
+      width: 22px; height: 0; border-top: 3px dashed; flex-shrink: 0;
+    }
+    .legend-rect {
+      width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+      opacity: .6;
+    }
+
+    /* ── Stats panel ── */
+    .stats-panel {
+      position: absolute; top: 12px; right: 12px; z-index: 1000;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(6px);
+      padding: 14px 18px; border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+      font-size: 12px; min-width: 200px;
+    }
+    .stats-panel h4 { font-size: 13px; color: #1a1a2e; margin-bottom: 8px; }
+    .stat-row { display: flex; justify-content: space-between; padding: 3px 0; }
+    .stat-label { color: #555; }
+    .stat-value { font-weight: 600; color: #1a1a2e; }
+
+    /* ── Popup ── */
+    .station-popup h3 { font-size: 14px; margin-bottom: 4px; }
+    .station-popup .thai-name { font-size: 12px; color: #777; margin-bottom: 6px; }
+    .station-popup .line-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      color: #fff; font-size: 11px; font-weight: 600;
+    }
+    .station-popup table { margin-top: 6px; font-size: 11px; }
+    .station-popup td { padding: 2px 6px 2px 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .map-title { left: 10px; right: 10px; max-width: none; top: 8px; padding: 8px 12px; }
+      .map-title h1 { font-size: 14px; }
+      .stats-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Title -->
+<div class="map-title">
+  <h1>Bangkok Rail Transit Accessibility</h1>
+  <p>Spatial analysis of 1 km walking-distance coverage around 125 rail stations</p>
+</div>
+
+<!-- Stats -->
+<div class="stats-panel" id="stats">
+  <h4>Coverage Summary</h4>
+  <div class="stat-row"><span class="stat-label">Total Stations</span><span class="stat-value" id="s-stations">—</span></div>
+  <div class="stat-row"><span class="stat-label">Coverage Area</span><span class="stat-value" id="s-area">—</span></div>
+  <div class="stat-row"><span class="stat-label">Buffer Radius</span><span class="stat-value" id="s-radius">—</span></div>
+  <div class="stat-row"><span class="stat-label">Desert Gaps</span><span class="stat-value" id="s-gaps">—</span></div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <h4>Legend</h4>
+  <div class="legend-item"><span class="legend-swatch" style="background:#0332F8"></span> Airport Rail Link</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#92D04E"></span> Sukhumvit Line (BTS)</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#007D38"></span> Silom Line (BTS)</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#BA9006"></span> Gold Line (BTS)</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#7D80F3"></span> Blue Line (MRT)</div>
+  <div class="legend-item"><span class="legend-swatch" style="background:#6D2EA0"></span> Purple Line (MRT)</div>
+  <div class="legend-item" style="margin-top:6px"><span class="legend-rect" style="background:#1E90FF"></span> Network Footprint</div>
+  <div class="legend-item"><span class="legend-dash" style="border-color:#FF0000"></span> Transit Desert Gap</div>
+  <div class="legend-item"><span class="legend-rect" style="background:#FF4444"></span> Transit Desert Zone</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  // ── Map setup ──
+  const map = L.map('map', {
+    center: [13.75, 100.55],
+    zoom: 11,
+    zoomControl: false
+  });
+
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // ── Basemap tiles ──
+  const osmLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19
+  });
+  const osmDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19
+  });
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '&copy; Esri',
+    maxZoom: 19
+  });
+
+  osmLight.addTo(map);
+
+  // ── Layer groups ──
+  const stationMarkers = L.layerGroup();
+  const bufferPolygons = L.layerGroup();
+  const networkFootprint = L.layerGroup();
+  const desertGaps = L.layerGroup();
+  const desertZones = L.layerGroup();
+
+  // ── Load GeoJSON ──
+  fetch('coverage.geojson')
+    .then(r => r.json())
+    .then(data => {
+      // Populate stats
+      const meta = data.metadata || {};
+      document.getElementById('s-stations').textContent = meta.total_stations || '—';
+      document.getElementById('s-area').textContent = meta.transit_coverage_sqkm ? meta.transit_coverage_sqkm + ' km\u00B2' : '—';
+      document.getElementById('s-radius').textContent = meta.buffer_radius_km ? meta.buffer_radius_km + ' km' : '—';
+      document.getElementById('s-gaps').textContent = meta.transit_desert_gaps ? meta.transit_desert_gaps.length : '0';
+
+      // Process features
+      data.features.forEach(f => {
+        const p = f.properties;
+        const geom = f.geometry;
+
+        switch (p.type) {
+
+          case 'station': {
+            const [lng, lat] = geom.coordinates;
+            const color = p.color || '#888';
+            const marker = L.circleMarker([lat, lng], {
+              radius: 6, fillColor: color, color: '#fff',
+              weight: 2, opacity: 1, fillOpacity: 0.9
+            });
+            marker.bindPopup(`
+              <div class="station-popup">
+                <h3>${p.name}</h3>
+                <div class="thai-name">${p.nameTH || ''}</div>
+                <span class="line-badge" style="background:${color}">${p.line}</span>
+                <table>
+                  <tr><td>Station ID</td><td><strong>${p.stationId}</strong></td></tr>
+                  <tr><td>Service</td><td>${p.service}</td></tr>
+                </table>
+              </div>
+            `);
+            stationMarkers.addLayer(marker);
+            break;
+          }
+
+          case 'buffer_1km': {
+            const coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+            const color = p.color || '#888';
+            const poly = L.polygon(coords, {
+              color: color, weight: 1, opacity: 0.5,
+              fillColor: color, fillOpacity: 0.12
+            });
+            poly.bindPopup(`<strong>${p.name}</strong><br>${p.line}<br>1 km walkable buffer`);
+            bufferPolygons.addLayer(poly);
+            break;
+          }
+
+          case 'network_footprint': {
+            const coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+            const poly = L.polygon(coords, {
+              color: '#1E90FF', weight: 2, opacity: 0.4,
+              fillColor: '#1E90FF', fillOpacity: 0.04,
+              dashArray: '8 4'
+            });
+            poly.bindPopup('<strong>Network Footprint</strong><br>Convex hull of all rail stations');
+            networkFootprint.addLayer(poly);
+            break;
+          }
+
+          case 'transit_desert_gap': {
+            const coords = geom.coordinates.map(c => [c[1], c[0]]);
+            const line = L.polyline(coords, {
+              color: '#FF0000', weight: 3, opacity: 0.8,
+              dashArray: '10 6'
+            });
+            line.bindPopup(`
+              <strong>Transit Desert Gap</strong><br>
+              ${p.from_station} &rarr; ${p.to_station}<br>
+              <strong>${p.gap_km} km</strong> (${p.line})
+            `);
+            desertGaps.addLayer(line);
+            break;
+          }
+
+          case 'transit_desert_zone': {
+            const coords = geom.coordinates[0].map(c => [c[1], c[0]]);
+            const poly = L.polygon(coords, {
+              color: '#FF4444', weight: 1.5, opacity: 0.5,
+              fillColor: '#FF4444', fillOpacity: 0.12
+            });
+            poly.bindPopup(`
+              <strong>Transit Desert Zone #${p.rank}</strong><br>
+              Nearest station: ${p.nearest_station_km} km away
+            `);
+            desertZones.addLayer(poly);
+            break;
+          }
+        }
+      });
+
+      // Add default layers
+      stationMarkers.addTo(map);
+      bufferPolygons.addTo(map);
+      networkFootprint.addTo(map);
+      desertGaps.addTo(map);
+      desertZones.addTo(map);
+
+      // Layer controls
+      L.control.layers(
+        { 'Light': osmLight, 'Dark': osmDark, 'Satellite': satellite },
+        {
+          'Stations': stationMarkers,
+          '1 km Buffers': bufferPolygons,
+          'Network Footprint': networkFootprint,
+          'Transit Desert Gaps': desertGaps,
+          'Transit Desert Zones': desertZones
+        },
+        { position: 'topright', collapsed: true }
+      ).addTo(map);
+    })
+    .catch(err => {
+      console.error('Failed to load coverage.geojson:', err);
+      document.getElementById('stats').innerHTML = '<p style="color:red">Failed to load data. Serve this page via a local HTTP server.</p>';
+    });
+
+  // ── Scale control ──
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
+})();
+</script>
+</body>
+</html>
