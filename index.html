@@ -247,11 +247,30 @@
         const svg = document.getElementById('mapSvg');
         const tooltip = document.getElementById('tooltip');
         
-        // Convert lat/lng to SVG coordinates
+        // Convert lat/lng to SVG coordinates using Web Mercator projection
         function latLngToSVG(lng, lat, bounds, svgWidth, svgHeight) {
-            const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * svgWidth;
-            const y = svgHeight - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * svgHeight;
+            // Convert to Web Mercator
+            const x_merc = lngToMercatorX(lng);
+            const y_merc = latToMercatorY(lat);
+            
+            const bounds_x_min = lngToMercatorX(bounds.minLng);
+            const bounds_x_max = lngToMercatorX(bounds.maxLng);
+            const bounds_y_min = latToMercatorY(bounds.minLat);
+            const bounds_y_max = latToMercatorY(bounds.maxLat);
+            
+            const x = ((x_merc - bounds_x_min) / (bounds_x_max - bounds_x_min)) * svgWidth;
+            const y = svgHeight - ((y_merc - bounds_y_min) / (bounds_y_max - bounds_y_min)) * svgHeight;
             return { x, y };
+        }
+        
+        // Web Mercator projection functions
+        function lngToMercatorX(lng) {
+            return lng * Math.PI / 180;
+        }
+        
+        function latToMercatorY(lat) {
+            const latRad = lat * Math.PI / 180;
+            return Math.log(Math.tan(Math.PI / 4 + latRad / 2));
         }
         
         // Get bounds from GeoJSON
@@ -283,7 +302,7 @@
                 }
             });
             
-            // Add padding
+            // Add padding in geographic coordinates
             const latPadding = (maxLat - minLat) * 0.1;
             const lngPadding = (maxLng - minLng) * 0.1;
             
@@ -433,16 +452,43 @@
             if (!geojsonData) return;
             
             const svgRect = svg.getBoundingClientRect();
-            const svgWidth = svgRect.width;
-            const svgHeight = svgRect.height;
+            let svgWidth = svgRect.width;
+            let svgHeight = svgRect.height;
             
             svg.innerHTML = '';
             
             const bounds = getBounds(geojsonData.features);
             
+            // Calculate the aspect ratio of the projected bounds
+            const bounds_x_min = lngToMercatorX(bounds.minLng);
+            const bounds_x_max = lngToMercatorX(bounds.maxLng);
+            const bounds_y_min = latToMercatorY(bounds.minLat);
+            const bounds_y_max = latToMercatorY(bounds.maxLat);
+            
+            const projectedWidth = bounds_x_max - bounds_x_min;
+            const projectedHeight = bounds_y_max - bounds_y_min;
+            const projectedAspect = projectedWidth / projectedHeight;
+            const svgAspect = svgWidth / svgHeight;
+            
+            // Adjust rendering dimensions to maintain aspect ratio
+            let renderWidth = svgWidth;
+            let renderHeight = svgHeight;
+            let offsetX = 0;
+            let offsetY = 0;
+            
+            if (projectedAspect > svgAspect) {
+                // Projected data is wider - fit to width
+                renderHeight = svgWidth / projectedAspect;
+                offsetY = (svgHeight - renderHeight) / 2;
+            } else {
+                // Projected data is taller - fit to height
+                renderWidth = svgHeight * projectedAspect;
+                offsetX = (svgWidth - renderWidth) / 2;
+            }
+            
             // Create main group with transform
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('transform', `translate(${translateX}, ${translateY}) scale(${scale})`);
+            g.setAttribute('transform', `translate(${translateX + offsetX}, ${translateY + offsetY}) scale(${scale})`);
             
             // Draw features in order: footprint, buffers, deserts, gaps, stations
             const layers = {
@@ -460,8 +506,8 @@
                     const el = drawPolygon(
                         feature.geometry.coordinates[0],
                         bounds,
-                        svgWidth,
-                        svgHeight,
+                        renderWidth,
+                        renderHeight,
                         {
                             fillColor: feature.properties.color || '#1E90FF',
                             fillOpacity: feature.properties.fillOpacity || 0.05,
@@ -476,8 +522,8 @@
                     const el = drawPolygon(
                         feature.geometry.coordinates[0],
                         bounds,
-                        svgWidth,
-                        svgHeight,
+                        renderWidth,
+                        renderHeight,
                         {
                             fillColor: feature.properties.color || '#4169E1',
                             fillOpacity: 0.15,
@@ -491,8 +537,8 @@
                     const el = drawPolygon(
                         feature.geometry.coordinates[0],
                         bounds,
-                        svgWidth,
-                        svgHeight,
+                        renderWidth,
+                        renderHeight,
                         {
                             fillColor: feature.properties.color || '#FF4444',
                             fillOpacity: feature.properties.fillOpacity || 0.15,
@@ -506,8 +552,8 @@
                     const el = drawLine(
                         feature.geometry.coordinates,
                         bounds,
-                        svgWidth,
-                        svgHeight,
+                        renderWidth,
+                        renderHeight,
                         {
                             stroke: '#FF0000',
                             strokeWidth: 3,
@@ -522,8 +568,8 @@
                         lng,
                         lat,
                         bounds,
-                        svgWidth,
-                        svgHeight,
+                        renderWidth,
+                        renderHeight,
                         {
                             radius: 6,
                             fillColor: feature.properties.color || '#0332F8',
