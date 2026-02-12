@@ -371,6 +371,12 @@
         }
         
         // Tooltip functions
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         function showTooltip(e, html) {
             tooltip.innerHTML = html;
             tooltip.style.display = 'block';
@@ -392,30 +398,30 @@
             let content = '<div class="popup-content">';
             
             if (props.type === 'station') {
-                content += `<h3>🚉 ${props.name}</h3>`;
+                content += `<h3>🚉 ${escapeHtml(props.name)}</h3>`;
                 if (props.nameTH) {
-                    content += `<div class="detail"><span class="label">Thai Name:</span> ${props.nameTH}</div>`;
+                    content += `<div class="detail"><span class="label">Thai Name:</span> ${escapeHtml(props.nameTH)}</div>`;
                 }
-                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
-                content += `<div class="detail"><span class="label">Service:</span> ${props.service}</div>`;
+                content += `<div class="detail"><span class="label">Line:</span> ${escapeHtml(props.line)}</div>`;
+                content += `<div class="detail"><span class="label">Service:</span> ${escapeHtml(props.service)}</div>`;
             } else if (props.type === 'buffer_1km') {
                 content += `<h3>📍 Station Buffer</h3>`;
-                content += `<div class="detail"><span class="label">Station:</span> ${props.name}</div>`;
-                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
-                content += `<div class="detail"><span class="label">Radius:</span> ${props.radius_km} km</div>`;
+                content += `<div class="detail"><span class="label">Station:</span> ${escapeHtml(props.name)}</div>`;
+                content += `<div class="detail"><span class="label">Line:</span> ${escapeHtml(props.line)}</div>`;
+                content += `<div class="detail"><span class="label">Radius:</span> ${escapeHtml(String(props.radius_km))} km</div>`;
             } else if (props.type === 'transit_desert_gap') {
                 content += `<h3>⚠️ Transit Desert Gap</h3>`;
-                content += `<div class="detail"><span class="label">Line:</span> ${props.line}</div>`;
-                content += `<div class="detail"><span class="label">From:</span> ${props.from_station}</div>`;
-                content += `<div class="detail"><span class="label">To:</span> ${props.to_station}</div>`;
-                content += `<div class="detail"><span class="label">Gap:</span> ${props.gap_km} km</div>`;
+                content += `<div class="detail"><span class="label">Line:</span> ${escapeHtml(props.line)}</div>`;
+                content += `<div class="detail"><span class="label">From:</span> ${escapeHtml(props.from_station)}</div>`;
+                content += `<div class="detail"><span class="label">To:</span> ${escapeHtml(props.to_station)}</div>`;
+                content += `<div class="detail"><span class="label">Gap:</span> ${escapeHtml(String(props.gap_km))} km</div>`;
             } else if (props.type === 'transit_desert_zone') {
                 content += `<h3>🏜️ Transit Desert Zone</h3>`;
-                content += `<div class="detail"><span class="label">Rank:</span> #${props.rank}</div>`;
-                content += `<div class="detail"><span class="label">Nearest Station:</span> ${props.nearest_station_km} km</div>`;
+                content += `<div class="detail"><span class="label">Rank:</span> #${escapeHtml(String(props.rank))}</div>`;
+                content += `<div class="detail"><span class="label">Nearest Station:</span> ${escapeHtml(String(props.nearest_station_km))} km</div>`;
             } else if (props.type === 'network_footprint') {
                 content += `<h3>🗺️ Network Footprint</h3>`;
-                content += `<div class="detail">${props.description}</div>`;
+                content += `<div class="detail">${escapeHtml(props.description)}</div>`;
             }
             
             content += '</div>';
