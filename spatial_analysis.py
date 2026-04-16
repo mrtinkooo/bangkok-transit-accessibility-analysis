@@ -2,7 +2,7 @@
 Bangkok Rail Network – Spatial Accessibility Analysis
 ======================================================
 This script:
-  1. Creates 1 km buffers (~10-15 min walk) around every station.
+  1. Creates 800 m buffers (~10 min walk) around every station.
   2. Calculates 'Transit Coverage' — total urban area served (sq km).
   3. Identifies 'Transit Deserts' — gaps where consecutive stations on the
      same line are more than 5 km apart.
@@ -47,7 +47,7 @@ print(f"✅ Loaded {len(stations)} stations from {DATA_PATH}")
 KM_PER_DEG_LAT = 110.574
 KM_PER_DEG_LNG = 107.551  # cos(13.7°) * 111.320
 
-BUFFER_KM = 1.0   # ~10-15 min walk radius
+BUFFER_KM = 0.8   # ~10 min walk radius
 GAP_THRESHOLD_KM = 5.0  # transit-desert threshold
 
 
@@ -77,7 +77,7 @@ def circle_polygon(lat, lng, radius_km, n_points=64):
 
 
 # ---------------------------------------------------------------------------
-# 2. Build individual 1 km buffer polygons for each station
+# 2. Build individual 800 m buffer polygons for each station
 # ---------------------------------------------------------------------------
 station_features = []
 buffer_polygons = []  # list of coordinate rings for union later
@@ -108,7 +108,7 @@ for s in stations:
     station_features.append({
         "type": "Feature",
         "properties": {
-            "type": "buffer_1km",
+            "type": "buffer_800m",
             "stationId": s["stationId"],
             "name": s["nameEng"],
             "line": s["lineNameEng"],
@@ -121,7 +121,7 @@ for s in stations:
         },
     })
 
-print(f"✅ Created {len(stations)} individual 1 km buffer polygons")
+print(f"✅ Created {len(stations)} individual 800 m buffer polygons")
 
 # ---------------------------------------------------------------------------
 # 3. Estimate total Transit Coverage area (sq km)
@@ -170,7 +170,7 @@ print(f"\n{'='*60}")
 print(f"🚆  TRANSIT COVERAGE SUMMARY")
 print(f"{'='*60}")
 print(f"  Stations analysed     : {len(stations)}")
-print(f"  Buffer radius         : {BUFFER_KM} km (~10-15 min walk)")
+print(f"  Buffer radius         : {BUFFER_KM} km (~10 min walk)")
 print(f"  Grid resolution       : {CELL_SIZE_KM*1000:.0f} m")
 print(f"  Covered cells         : {covered_cells:,} / {n_rows * n_cols:,}")
 print(f"  ▸ Transit Coverage    : {total_coverage_sqkm:.2f} sq km")
@@ -347,7 +347,7 @@ geojson = {
     "metadata": {
         "title": "Bangkok Rail Network – Spatial Accessibility Analysis",
         "description": (
-            "1 km station buffers (~10-15 min walk), transit desert gaps, "
+            "800 m station buffers (~10 min walk), transit desert gaps, "
             "and network coverage footprint."
         ),
         "transit_coverage_sqkm": round(total_coverage_sqkm, 2),
@@ -377,7 +377,7 @@ print(f"""
 Based on this spatial analysis, the following insights can guide
 Transit-Oriented Development planning in Bangkok:
 
-1. HIGH-PRIORITY TOD ZONES (within 1 km buffers)
+1. HIGH-PRIORITY TOD ZONES (within 800 m buffers)
    ─────────────────────────────────────────────
    • The {total_coverage_sqkm:.1f} sq km coverage area is ideal for
      mixed-use, high-density zoning (FAR bonuses near stations).
@@ -401,15 +401,15 @@ Transit-Oriented Development planning in Bangkok:
 3. LAND-USE & DENSITY POLICY
    ─────────────────────────────────────────────
    • Implement density gradients: highest FAR within 500 m of
-     stations, tapering to medium density at the 1 km boundary.
+     stations, tapering to medium density at the 800 m boundary.
    • Encourage ground-floor retail / mixed-use within buffer zones
      to maximise pedestrian activity and ridership.
    • Restrict low-density, car-oriented development within the
-     1 km station catchment to reduce induced traffic.
+     800 m station catchment to reduce induced traffic.
 
 4. WALKABILITY & LAST-MILE IMPROVEMENTS
    ─────────────────────────────────────────────
-   • The 1 km buffer assumes pedestrian access — cities must invest
+   • The 800 m buffer assumes pedestrian access — cities must invest
      in safe sidewalks, covered walkways, and wayfinding signage.
    • Deploy bike-sharing stations at every rail station to extend
      the effective catchment to ~3 km.
